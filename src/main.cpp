@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 #include <PololuRPiSlave.h>
-// #include <Romi32U4.h>
+#include <Wire.h>
 #include <AStar32U4.h>
 #include <Servo.h>
 
@@ -36,10 +36,14 @@ Digital pin 10, or PB6, controls the speed of motor 2 with PWM.
 */
 
 // Set up the servos
-#define PWM_INDEX A5
+// #define ENABLE_INDEX A4 // PWM
+// #define PHASE_INDEX A5 // Direction
+#define ENABLE_INDEX 5 // PWM
+#define PHASE_INDEX 4 // Direction
+
 
 // Servo pwms[5];
-Servo indexPWM;
+// Servo indexPWM;
 
 AStar32U4Motors motors;
 // TODO need to read potentiometers
@@ -75,10 +79,10 @@ unsigned long TIME_INTERVAL = 1000;
 // 74HC4067 multiplexer setup (16 to 1)
 
 //Mux control pins
-int s0 = 0;
-int s1 = 1;
-int s2 = 15;
-int s3 = 16;
+int s0 = 4;
+int s1 = 5;
+int s2 = 6;
+int s3 = 7;
 
 //Mux in "SIG" pin
 int SIG_pin = A8;
@@ -96,7 +100,10 @@ void setupAnalogMUX() {
 }
 
 void configureMotors() {
-  indexPWM.attach(A5);
+  // indexPWM.attach(A5);
+  // Setup motor pins
+  pinMode(PHASE_INDEX,OUTPUT);
+  pinMode(ENABLE_INDEX,OUTPUT);
 }
 
 int readMux(int channel){
@@ -139,11 +146,19 @@ void readEncoders()
   //Reports back Value at channel 6 is: 346
   for(int i = 0; i < 2; i ++){
     int percentage = map(readMux(i), 0, 1023, 0, 100);
-    Serial.print("Potentiometer ");
-    Serial.print(i);
-    Serial.print(" is at ");
-    Serial.print(percentage);
-    Serial.println("%");
+    // Serial.print("Potentiometer ");
+    // Serial.print(i);
+    // Serial.print(" is at ");
+    // Serial.print(percentage);
+    // Serial.println("%");
+
+    // TODO change to array
+    if (i == 0) {
+      rPiLink.buffer.leftEncoder = percentage;
+    } else {
+      rPiLink.buffer.rightEncoder = percentage;
+    }
+    
     // delay(1000);
   }
 }
@@ -162,6 +177,14 @@ void normalModeInit() {
   ledRed(false);
   Serial.begin(9600);
   Serial.println("Normal mode init");
+}
+
+void startMotors(int speed) {
+  // FORWARD
+  digitalWrite(PHASE_INDEX,HIGH); // direction
+  analogWrite(ENABLE_INDEX,speed); // PWM
+  // io.digitalWrite(SX1509_AIN2, LOW); // Enable
+  // io.analogWrite(SX1509_AIN2, speed); // Enable
 }
 
 void normalModeLoop() {
@@ -216,13 +239,11 @@ void normalModeLoop() {
 
   // Motors
   motors.setSpeeds(rPiLink.buffer.leftMotor, rPiLink.buffer.rightMotor);
-  indexPWM.write(0);
-
-  // Restrict servo movements for the Romi Arm         
-  // indexPWM.write(map(rPiLink.buffer.extIoValues[i], -400, 400, 0, 180));
-
+  startMotors(rPiLink.buffer.leftMotor); 
+  
   // Encoders
-  // TODO read the potentiometers instead of the encoders
+  readEncoders();
+
   if (rPiLink.buffer.resetLeftEncoder) {
     rPiLink.buffer.resetLeftEncoder = false;
     // encoders.getCountsAndResetLeft();
@@ -235,8 +256,8 @@ void normalModeLoop() {
 
 //   rPiLink.buffer.leftEncoder = encoders.getCountsLeft();
 //   rPiLink.buffer.rightEncoder = encoders.getCountsRight();
-  rPiLink.buffer.leftEncoder = 0;
-  rPiLink.buffer.rightEncoder = 0;
+  // rPiLink.buffer.leftEncoder = 0;
+  // rPiLink.buffer.rightEncoder = 0;
 
   rPiLink.buffer.batteryMillivolts = battMV;
 }
@@ -251,9 +272,10 @@ void setup() {
   //   motors.flipRightMotor(true);
 
   normalModeInit();
+  configureMotors();
 
   // Setup analog Multiplexer to read the encoders.
-  // setupAnalogMUX();
+  setupAnalogMUX();
 }
 
 void loop() {
