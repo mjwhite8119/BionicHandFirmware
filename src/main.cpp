@@ -148,92 +148,6 @@ void readEncoders()
   }
 }
 
-void configureBuiltins(uint8_t config) {
-  // structure
-  // [ConfigFlag] [Unused] [Unused] [Unused] [Unused] [DIO 2 Mode] [DIO 1 Mode] [Unused]
-  //       7         6        5         4        3          2            1          0
-
-  // We only care about bits 1 and 2
-  builtinDio1Config = (config >> 1) & 0x1;
-  builtinDio2Config = (config >> 2) & 0x1;
-
-  // Turn off LEDs if in INPUT mode
-  if (builtinDio1Config == kModeDigitalIn) {
-    ledGreen(false);
-  }
-  if (builtinDio2Config == kModeDigitalIn) {
-    ledRed(false);
-  }
-
-  // Wipe out the register
-  rPiLink.buffer.builtinConfig = 0;
-}
-
-// void configureIO(uint16_t config) {
-//   // 16 bit config register
-//   //
-//   // MSB
-//   // 0 | NEW CONFIG FLAG |
-//   //   |-----------------|
-//   // 1 |  Pin 0 Mode     |
-//   // 2 |  ArdPin 11      |
-//   //   |-----------------|
-//   // 3 |  Pin 1 Mode     |
-//   // 4 |  ArdPin 4       |
-//   //   |-----------------|
-//   // 5 |  Pin 2 Mode     |
-//   // 6 |  ArdPin 20      |
-//   //   |-----------------|
-//   // 7 |  Pin 3 Mode     |
-//   // 8 |  ArdPin 21      |
-//   //   |-----------------|
-//   // 9 |  Pin 4 Mode     |
-//   // 10|  ArdPin 22      |
-//   //   |-----------------|
-//   // 11|  RESERVED       |
-//   // 12|                 |
-//   // 13|                 |
-//   // 14|                 |
-//   // 15|                 |
-//   for (uint8_t ioChannel = 0; ioChannel < 5; ioChannel++) {
-//     uint8_t offset = 13 - (2 * ioChannel);
-//     uint8_t mode = (config >> offset) & 0x3;
-
-//     // Disconnect PWMs
-//     if (pwms[ioChannel].attached()) {
-//       pwms[ioChannel].detach();
-//     }
-
-//     ioChannelModes[ioChannel] = mode;
-
-//     switch(mode) {
-//       case kModeDigitalOut:
-//         pinMode(ioDioPins[ioChannel], OUTPUT);
-//         break;
-//       case kModeDigitalIn:
-//         pinMode(ioDioPins[ioChannel], INPUT_PULLUP);
-//         break;
-//       case kModePwm:
-//         pwms[ioChannel].attach(ioDioPins[ioChannel]);
-//         break;
-//       case kModeAnalogIn:
-//         if (ioChannel > 0) {
-//           // Make sure we set the pin back correctly
-//           digitalWrite(ioAinPins[ioChannel], LOW);
-//           pinMode(ioAinPins[ioChannel], INPUT);
-//         }
-//         break;
-//     }
-//   }
-
-//   // Also set the status flag
-//   rPiLink.buffer.status = 1;
-//   isConfigured = true;
-
-//   // Reset the config register
-//   rPiLink.buffer.ioConfig = 0;
-// }
-
 // Initialization routines for normal operation
 void normalModeInit() {
   buzzer.play("v10>>g16>>>c16");
@@ -275,22 +189,6 @@ void normalModeLoop() {
     rPiLink.buffer.heartbeat = false;
   }
 
-  uint8_t builtinConfig = rPiLink.buffer.builtinConfig;
-  if ((builtinConfig >> 7) & 0x1) {
-    configureBuiltins(builtinConfig);
-  }
-
-  uint16_t ioConfig = rPiLink.buffer.ioConfig;
-  if ((ioConfig >> 15) & 0x1) {
-    // Also set the status flag
-    rPiLink.buffer.status = 1;
-    isConfigured = true;
-
-    // Reset the config register
-    rPiLink.buffer.ioConfig = 0;
-    // configureIO(ioConfig);
-  }
-
   // Update the built-ins
   rPiLink.buffer.builtinDioValues[0] = buttonA.isPressed();
 
@@ -316,45 +214,12 @@ void normalModeLoop() {
     ledRed(rPiLink.buffer.builtinDioValues[2]);
   }
 
-  // Loop through all available IO pins
-  // for (uint8_t i = 0; i < 5; i++) {
-  //   switch (ioChannelModes[i]) {
-  //     case kModeDigitalOut: {
-  //       digitalWrite(ioDioPins[i], rPiLink.buffer.extIoValues[i] ? HIGH : LOW);
-  //       // Serial.print("extIO ");Serial.print(i);Serial.println(" is DigitalOut");
-  //     } break;
-  //     case kModeDigitalIn: {
-  //       int dIn =  digitalRead(ioDioPins[i]);
-  //       rPiLink.buffer.extIoValues[i] = digitalRead(ioDioPins[i]);
-  //       // if (lastServoAngle[i] != dIn) {
-  //       //   Serial.print("extIO ");Serial.print(i);Serial.print(" is DigitalIn ");Serial.println(dIn);
-  //       // }      
-  //       // lastServoAngle[i] = dIn;
-  //     } break;
-  //     case kModeAnalogIn: {
-  //       if (ioAinPins[i] != 0) {
-  //         rPiLink.buffer.extIoValues[i] = analogRead(ioAinPins[i]);
-  //       }
-  //     } break;
-  //     case kModePwm: {
-  //       // Only allow writes to PWM if we're not currently locked out due to low voltage
-  //       if (pwms[i].attached()) {
-  //         if (!lvHelper.isLowVoltage()) {
-  //           // Restrict servo movements for the Romi Arm         
-  //             pwms[i].write(map(rPiLink.buffer.extIoValues[i], -400, 400, 0, 180));
-  //         }
-  //         else {
-  //           // Attempt to zero out servo-motors in a low voltage mode
-  //           pwms[i].write(120);
-  //         }
-  //       }
-  //     } break;
-  //   }
-  // }
-
   // Motors
   motors.setSpeeds(rPiLink.buffer.leftMotor, rPiLink.buffer.rightMotor);
   indexPWM.write(0);
+
+  // Restrict servo movements for the Romi Arm         
+  // indexPWM.write(map(rPiLink.buffer.extIoValues[i], -400, 400, 0, 180));
 
   // Encoders
   // TODO read the potentiometers instead of the encoders
@@ -386,10 +251,6 @@ void setup() {
   //   motors.flipRightMotor(true);
 
   normalModeInit();
-  // motors.setSpeeds(80, 80);
-  // delay(1000);
-  // motors.setSpeeds(0, 0);
-  // delay(1000);
 
   // Setup analog Multiplexer to read the encoders.
   // setupAnalogMUX();
@@ -401,11 +262,6 @@ void loop() {
 
   // Constantly write the firmware ident
   rPiLink.buffer.firmwareIdent = FIRMWARE_IDENT;
-
-  // This can be removed.  We don't need the status flag and isConfigured
-  if (isConfigured) {
-    rPiLink.buffer.status = 1;
-  }
 
   normalModeLoop();
 
