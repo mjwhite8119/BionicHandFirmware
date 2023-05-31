@@ -218,8 +218,8 @@ void normalModeLoop() {
   // Check if button A is pressed
   if (rPiLink.buffer.builtinDioValues[0]) {
     Serial.println("ButtonA is pressed...");
-    rPiLink.buffer.leftMotor = 80;
-    rPiLink.buffer.rightMotor = 80;
+    rPiLink.buffer.leftMotor = 200;
+    rPiLink.buffer.rightMotor = 0;
   }
   ledYellow(rPiLink.buffer.builtinDioValues[3]);
 
