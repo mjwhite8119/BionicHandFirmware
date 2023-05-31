@@ -175,6 +175,13 @@ void normalModeInit() {
   ledYellow(true);
   ledGreen(false);
   ledRed(false);
+
+  // RPi wants the status to be 1 otherwise it will report a brownout.
+  rPiLink.buffer.status = 1;
+
+  // Flip the right side motor to better match normal FRC setups
+  //   motors.flipRightMotor(true);
+
   Serial.begin(9600);
   Serial.println("Normal mode init");
 }
@@ -268,10 +275,8 @@ void setup() {
   // Set up the buzzer in playcheck mode
   buzzer.playMode(PLAY_CHECK);
 
-  // Flip the right side motor to better match normal FRC setups
-  //   motors.flipRightMotor(true);
-
   normalModeInit();
+  
   configureMotors();
 
   // Setup analog Multiplexer to read the encoders.
